@@ -30,3 +30,13 @@ export { exportModels, getMemoryContext } from './export.js';
 
 export { sync } from './sync.js';
 export type { SyncOptions, SyncResult } from './sync.js';
+
+export {
+  loadGitHubRepo,
+  loadGitHubRepoFromUrl,
+  loadOpenClawSessions,
+  loadClaudeExport,
+  loadMarkdownDir,
+  loadText,
+} from './loaders.js';
+export type { LoadResult } from './loaders.js';

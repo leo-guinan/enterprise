@@ -69,6 +69,49 @@ app.get('/api/status', (c) => {
   });
 });
 
+// ─── Familiard Integration ───
+
+let familiardEscalationCount = 0;
+let familiardLastEscalation: number | null = null;
+
+// Receive escalations from Familiard
+app.post('/api/familiard/escalate', async (c) => {
+  const payload = await c.req.json();
+
+  // Ensure escalation thread exists
+  const threadId = 'familiard-escalations';
+  const existing = getThread(threadId);
+  if (!existing) {
+    createThread(threadId, '🔴 Familiard Escalations', null, Date.now());
+  }
+
+  // Build message from escalation
+  const summaries = (payload.events || [])
+    .map((e: any) => `• ${e.summary || e.reason}`)
+    .join('\n');
+  const content = `🔴 Familiard Escalation\n\n${summaries}${
+    payload.context ? `\n\nRecent activity:\n${payload.context}` : ''
+  }\n\nPlease analyze and respond.`;
+
+  const now = Date.now();
+  createMessage(uuid(), threadId, 'user', content, 'pending',
+    JSON.stringify({ source: 'familiard', priority: 'high', events: payload.events }), now);
+  updateThread('🔴 Familiard Escalations', now, threadId);
+
+  familiardEscalationCount++;
+  familiardLastEscalation = now;
+
+  return c.json({ ok: true, escalationCount: familiardEscalationCount });
+});
+
+// Familiard status
+app.get('/api/familiard/status', (c) => {
+  return c.json({
+    lastEscalation: familiardLastEscalation,
+    escalationCount: familiardEscalationCount,
+  });
+});
+
 // Pyramid memory status (reads separate pyramid DB)
 app.get('/api/pyramid/status', async (c) => {
   const { homedir } = await import('os');
