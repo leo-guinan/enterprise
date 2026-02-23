@@ -8,6 +8,9 @@
     "ui": "vite",
     "server": "tsx server/index.ts",
     "daemon": "node daemon/poll.mjs",
+    "daemon:loop": "node daemon/poll.mjs --loop --interval=5 --pyramid-interval=600",
+    "pyramid": "node daemon/pyramid-sync.mjs",
+    "pyramid:loop": "node daemon/pyramid-sync.mjs --loop --interval=300",
     "build": "vite build"
   },
   "dependencies": {

@@ -69,6 +69,39 @@ app.get('/api/status', (c) => {
   });
 });
 
+// Pyramid memory status (reads separate pyramid DB)
+app.get('/api/pyramid/status', async (c) => {
+  const { homedir } = await import('os');
+  const { join } = await import('path');
+  const { existsSync, readFileSync } = await import('fs');
+  const pyramidPath = join(homedir(), '.enterprise', 'memory', 'pyramid.db');
+  if (!existsSync(pyramidPath)) return c.json({ initialized: false });
+
+  try {
+    const initSqlJs = (await import('sql.js')).default;
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(readFileSync(pyramidPath));
+    const models = db.exec('SELECT COUNT(*) FROM models')[0]?.values[0]?.[0] || 0;
+    const observations = db.exec('SELECT COUNT(*) FROM observations')[0]?.values[0]?.[0] || 0;
+    const summaries = db.exec('SELECT COUNT(*) FROM summaries')[0]?.values[0]?.[0] || 0;
+    const dirty = db.exec('SELECT COUNT(*) FROM models WHERE content_dirty = 1')[0]?.values[0]?.[0] || 0;
+    db.close();
+    return c.json({ initialized: true, models, observations, summaries, dirty });
+  } catch (e) {
+    return c.json({ initialized: false, error: (e as Error).message });
+  }
+});
+
+// Pyramid memory context (for injecting into prompts)
+app.get('/api/pyramid/context', async (c) => {
+  const { homedir } = await import('os');
+  const { join } = await import('path');
+  const { existsSync, readFileSync } = await import('fs');
+  const memoryPath = join(homedir(), '.enterprise', 'memory', 'MEMORY.md');
+  if (!existsSync(memoryPath)) return c.text('No memory yet.');
+  return c.text(readFileSync(memoryPath, 'utf8'));
+});
+
 // Init DB then start server
 initDb().then(() => {
   const port = 4111;

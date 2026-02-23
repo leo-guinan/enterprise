@@ -86,6 +86,15 @@ async function processPending() {
       }
       prompt += '---\n\n';
     }
+    // Inject pyramid memory context if available
+    const memoryPath = join(homedir(), '.enterprise', 'memory', 'MEMORY.md');
+    if (existsSync(memoryPath)) {
+      const memory = readFileSync(memoryPath, 'utf8');
+      if (memory.length > 50) {
+        prompt += `[Memory context]\n${memory}\n\n---\n\n`;
+      }
+    }
+
     prompt += `Human: ${msg.content}`;
 
     // Call Claude Code CLI (uses Max plan auth)
@@ -125,14 +134,46 @@ async function processPending() {
   }
 }
 
+// Pyramid sync trigger — run after processing messages
+async function maybeTriggerPyramidSync() {
+  try {
+    const { execSync: exec } = await import('child_process');
+    exec('node daemon/pyramid-sync.mjs', {
+      cwd: new URL('.', import.meta.url).pathname.replace(/\/daemon\/$/, ''),
+      encoding: 'utf8',
+      timeout: 300000, // 5 min
+      stdio: 'inherit',
+    });
+  } catch (e) {
+    console.error('Pyramid sync failed:', e.message);
+  }
+}
+
+// Track if we processed anything this cycle (for pyramid trigger)
+let processedThisCycle = false;
+
 // Main
 const loop = process.argv.includes('--loop');
 const interval = parseInt(process.argv.find(a => a.startsWith('--interval='))?.split('=')[1] || '5') * 1000;
 
+const pyramidInterval = parseInt(process.argv.find(a => a.startsWith('--pyramid-interval='))?.split('=')[1] || '600') * 1000;
+let lastPyramidSync = 0;
+
 if (loop) {
-  console.log(`Enterprise daemon running (poll every ${interval / 1000}s)...`);
+  console.log(`Enterprise daemon running (poll every ${interval / 1000}s, pyramid every ${pyramidInterval / 1000}s)...`);
   const tick = async () => {
-    try { await processPending(); } catch (e) { console.error(e); }
+    try {
+      const found = await processPending();
+      if (found) processedThisCycle = true;
+
+      // Trigger pyramid sync periodically if we've processed messages
+      if (processedThisCycle && Date.now() - lastPyramidSync > pyramidInterval) {
+        console.log('Triggering pyramid sync...');
+        await maybeTriggerPyramidSync();
+        lastPyramidSync = Date.now();
+        processedThisCycle = false;
+      }
+    } catch (e) { console.error(e); }
     setTimeout(tick, interval);
   };
   tick();
