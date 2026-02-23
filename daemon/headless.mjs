@@ -493,6 +493,31 @@ function startServer() {
         });
       }
 
+      // Telemetry + Optimizations
+      if (url.pathname === '/api/telemetry' && method === 'GET') {
+        const tPath = join(DATA_DIR, 'telemetry.json');
+        if (existsSync(tPath)) return json(JSON.parse(readFileSync(tPath, 'utf8')));
+        return json({ error: 'No telemetry yet. Run: node daemon/telemetry.mjs' }, 404);
+      }
+
+      if (url.pathname === '/api/optimizations' && method === 'GET') {
+        const oPath = join(DATA_DIR, 'optimizations.json');
+        if (existsSync(oPath)) return json(JSON.parse(readFileSync(oPath, 'utf8')));
+        return json({ error: 'No optimizations yet. Run: node daemon/telemetry.mjs' }, 404);
+      }
+
+      // Trigger telemetry analysis
+      if (url.pathname === '/api/telemetry/run' && method === 'POST') {
+        try {
+          execSync(`node ${join(dirname(new URL(import.meta.url).pathname), 'telemetry.mjs')}`, {
+            encoding: 'utf8', timeout: 30000, stdio: 'pipe',
+          });
+          const oPath = join(DATA_DIR, 'optimizations.json');
+          if (existsSync(oPath)) return json(JSON.parse(readFileSync(oPath, 'utf8')));
+          return json({ ok: true });
+        } catch (e) { return json({ error: e.message }, 500); }
+      }
+
       // 404
       json({ error: 'Not found' }, 404);
     } catch (err) {

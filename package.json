@@ -17,7 +17,10 @@
     "deploy:tar": "node deploy.mjs --tar",
     "deploy:ssh": "node deploy.mjs --ssh",
     "headless": "node daemon/headless.mjs",
-    "fallback": "node daemon/fallback-bridge.mjs"
+    "fallback": "node daemon/fallback-bridge.mjs",
+    "telemetry": "node daemon/telemetry.mjs",
+    "telemetry:loop": "node daemon/telemetry.mjs --loop",
+    "optimize": "node daemon/telemetry.mjs && cat ~/.enterprise/optimizations.json"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

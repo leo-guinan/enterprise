@@ -42,7 +42,7 @@ mkdirSync(join(OUTPUT, 'daemon'), { recursive: true });
 mkdirSync(join(OUTPUT, 'systemd'), { recursive: true });
 
 // Copy daemon files
-for (const f of ['daemon/headless.mjs', 'daemon/pyramid-sync.mjs', 'daemon/pyramid-load.mjs', 'daemon/fallback-bridge.mjs']) {
+for (const f of ['daemon/headless.mjs', 'daemon/pyramid-sync.mjs', 'daemon/pyramid-load.mjs', 'daemon/fallback-bridge.mjs', 'daemon/telemetry.mjs']) {
   copyFileSync(f, join(OUTPUT, f));
 }
 

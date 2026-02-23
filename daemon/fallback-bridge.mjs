@@ -20,7 +20,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -196,8 +196,45 @@ if (health) {
   console.error('[bridge] WARNING: Remote unreachable. Will retry on each poll.');
 }
 
+// ─── Optimization Pull ───
+
+let lastOptimizationCheck = 0;
+const OPT_CHECK_INTERVAL = 3600000; // hourly
+
+async function checkOptimizations() {
+  if (Date.now() - lastOptimizationCheck < OPT_CHECK_INTERVAL) return;
+  lastOptimizationCheck = Date.now();
+
+  // Trigger remote telemetry analysis
+  await fetchRemote('/api/telemetry/run', { method: 'POST' });
+
+  // Pull optimizations
+  const data = await fetchRemote('/api/optimizations');
+  if (!data?.optimizations?.length) return;
+
+  const critical = data.optimizations.filter(o => o.severity === 'critical');
+  const warnings = data.optimizations.filter(o => o.severity === 'warning');
+  const info = data.optimizations.filter(o => o.severity === 'info');
+
+  if (critical.length || warnings.length) {
+    console.log(`\n[optimize] ${critical.length} critical, ${warnings.length} warnings, ${info.length} info`);
+    for (const opt of [...critical, ...warnings]) {
+      console.log(`  ${opt.severity === 'critical' ? '🔴' : '🟡'} ${opt.title}`);
+      console.log(`    ${opt.recommendation}`);
+      if (opt.script) console.log(`    Script:\n${opt.script.split('\n').map(l => '      ' + l).join('\n')}`);
+    }
+  }
+
+  // Save locally for reference
+  writeFileSync(
+    join(homedir(), '.enterprise', 'local-optimizations.json'),
+    JSON.stringify(data, null, 2)
+  );
+}
+
 const loop = () => {
-  tick().then(() => {
+  tick().then(async () => {
+    try { await checkOptimizations(); } catch (e) { console.error('[optimize]', e.message); }
     if (processed + errors > 0 && (processed + errors) % 10 === 0) {
       console.log(`[bridge] Stats: ${processed} processed, ${errors} errors`);
     }
