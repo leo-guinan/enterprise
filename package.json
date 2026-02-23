@@ -12,7 +12,11 @@
     "pyramid": "node daemon/pyramid-sync.mjs",
     "pyramid:loop": "node daemon/pyramid-sync.mjs --loop --interval=300",
     "pyramid:load": "node daemon/pyramid-load.mjs",
-    "build": "vite build"
+    "build": "vite build",
+    "deploy": "node deploy.mjs",
+    "deploy:tar": "node deploy.mjs --tar",
+    "deploy:ssh": "node deploy.mjs --ssh",
+    "headless": "node daemon/headless.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
