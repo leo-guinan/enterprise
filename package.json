@@ -20,7 +20,9 @@
     "fallback": "node daemon/fallback-bridge.mjs",
     "telemetry": "node daemon/telemetry.mjs",
     "telemetry:loop": "node daemon/telemetry.mjs --loop",
-    "optimize": "node daemon/telemetry.mjs && cat ~/.enterprise/optimizations.json"
+    "optimize": "node daemon/telemetry.mjs && cat ~/.enterprise/optimizations.json",
+    "benchmark": "node daemon/benchmark.mjs",
+    "benchmark:quick": "node daemon/benchmark.mjs --quick"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
