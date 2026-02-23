@@ -300,10 +300,9 @@ function processPending() {
     db.run('UPDATE messages SET status = ?, updated_at = ? WHERE id = ?', ['complete', now, msg.id]);
     console.log(`[daemon] ✓ Response (${result.response.length} chars)`);
   } else {
-    db.run('INSERT INTO messages (id, thread_id, role, content, status, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [randomUUID(), msg.thread_id, 'assistant', `Error: ${result.error}`, 'complete', null, now, now]);
+    // Mark as error — fallback bridge will pick these up
     db.run('UPDATE messages SET status = ?, updated_at = ? WHERE id = ?', ['error', now, msg.id]);
-    console.error(`[daemon] ✗ ${result.error}`);
+    console.error(`[daemon] ✗ ${result.error} — queued for fallback`);
   }
 
   saveDb();
@@ -435,6 +434,51 @@ function startServer() {
           pyDb.close();
           return json(stats);
         } catch { return json({ initialized: false }); }
+      }
+
+      // ─── Fallback Bridge Endpoints ───
+
+      // Get messages that need fallback processing
+      if (url.pathname === '/api/fallback/pending' && method === 'GET') {
+        // Messages that errored OR are pending while circuit is open
+        const errorMsgs = queryAll(
+          "SELECT * FROM messages WHERE status = 'error' AND role = 'user' ORDER BY created_at ASC LIMIT 5"
+        );
+        const pendingWhileOpen = circuitOpen
+          ? queryAll("SELECT * FROM messages WHERE status = 'pending' AND role = 'user' ORDER BY created_at ASC LIMIT 5")
+          : [];
+
+        const allMsgs = [...errorMsgs, ...pendingWhileOpen];
+        const result = allMsgs.map(msg => {
+          const history = queryAll(
+            "SELECT role, content FROM messages WHERE thread_id = ? AND status = 'complete' ORDER BY created_at ASC",
+            [msg.thread_id]
+          );
+          // Mark as processing so we don't double-send
+          db.run('UPDATE messages SET status = ?, updated_at = ? WHERE id = ?', ['processing', Date.now(), msg.id]);
+          saveDb();
+          return { message: msg, history };
+        });
+
+        return json({ messages: result, circuitOpen, dailyCost: dailyCost.toFixed(4) });
+      }
+
+      // Receive processed response from local fallback
+      if (url.pathname === '/api/fallback/respond' && method === 'POST') {
+        const body = await readBody();
+        const { messageId, threadId, content, metadata } = body;
+        const now = Date.now();
+
+        // Insert assistant response
+        db.run('INSERT INTO messages (id, thread_id, role, content, status, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [randomUUID(), threadId, 'assistant', content, 'complete',
+           JSON.stringify(metadata || { provider: 'fallback' }), now, now]);
+
+        // Mark original as complete
+        db.run('UPDATE messages SET status = ?, updated_at = ? WHERE id = ?', ['complete', now, messageId]);
+        saveDb();
+
+        return json({ ok: true });
       }
 
       // Cost log

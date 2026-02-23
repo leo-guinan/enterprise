@@ -16,7 +16,8 @@
     "deploy": "node deploy.mjs",
     "deploy:tar": "node deploy.mjs --tar",
     "deploy:ssh": "node deploy.mjs --ssh",
-    "headless": "node daemon/headless.mjs"
+    "headless": "node daemon/headless.mjs",
+    "fallback": "node daemon/fallback-bridge.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
